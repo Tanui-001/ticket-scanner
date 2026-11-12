@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,7 +81,7 @@
         </div>
 
         <p class="camera-note">
-            QR codes must contain JSON with the ticket ID and attendee name.
+            QR codes must contain JSON with at least the ticket ID and attendee name; email, phone and other fields are shown too. The camera stops after each scan.
             Camera access requires HTTPS or localhost.
         </p>
 
@@ -101,7 +100,7 @@
             <input
                 type="text"
                 id="ticket-id"
-                placeholder='{"id":"KC-1001","name":"Jane Doe","category":"VIP"}'
+                placeholder='{"id":"KC-1001","name":"Jane Doe","email":"jane@mail.com"}'
                 autocomplete="off"
             >
 
@@ -111,6 +110,13 @@
 
         </div>
 
+    </section>
+
+
+    <!-- EVENT CAPACITY -->
+    <section class="panel capacity-row">
+        <label for="capacity">Event capacity (for Slots Left)</label>
+        <input type="number" id="capacity" min="0" placeholder="e.g. 500">
     </section>
 
 
@@ -129,6 +135,13 @@
             <p id="result-details">
                 Scan a ticket QR code or paste its JSON details.
             </p>
+
+            <dl class="result-fields" id="result-fields"></dl>
+
+            <div class="result-actions">
+                <button class="btn" id="scan-next" hidden>📷 Scan next ticket</button>
+                <button class="btn" id="silence-alarm" hidden>🔕 Silence alarm</button>
+            </div>
         </div>
 
         <time id="result-time"></time>

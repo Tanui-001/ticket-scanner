@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
@@ -713,4 +712,76 @@ footer {
     .log-section {
         padding: 15px 12px 6px;
     }
+}
+
+
+/* ---------- ADDITIONS: scan details, alarm, capacity ---------- */
+
+.result-fields {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 14px;
+    margin: 10px 0 0;
+    font-size: 14px;
+}
+
+.result-fields:empty {
+    display: none;
+}
+
+.result-fields dt {
+    color: #ffffffb3;
+    text-transform: capitalize;
+}
+
+.result-fields dd {
+    margin: 0;
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.result-actions .btn {
+    background: white;
+    color: var(--navy);
+}
+
+.result-actions [hidden] {
+    display: none;
+}
+
+.result-card.alarm {
+    animation: alarm-flash 0.5s infinite alternate;
+}
+
+@keyframes alarm-flash {
+    from { background: linear-gradient(110deg, #c62c3d, #e34b59); }
+    to   { background: linear-gradient(110deg, #7a0b16, #b4172a); }
+}
+
+.capacity-row {
+    margin-top: 16px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.capacity-row label {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.capacity-row input {
+    width: 140px;
+    border: 1px solid #cbd8e9;
+    border-radius: 11px;
+    padding: 10px 12px;
 }
