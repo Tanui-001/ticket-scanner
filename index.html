@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#09284d">
+
+    <title>Kalenjin Connect 2.0 | Ticket Scanner</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+
+<body>
+
+<main class="app-shell">
+
+    <!-- HEADER -->
+    <header class="topbar">
+
+        <div class="brand-mark">KC</div>
+
+        <div class="brand-copy">
+            <h1>Kalenjin Connect <span>2.0</span></h1>
+            <p>EVENT TICKET SCANNER</p>
+        </div>
+
+        <div class="event-date">
+            <b>▦</b>
+            <div>
+                <strong id="event-date">Event day</strong>
+                <small>GATE MANAGEMENT</small>
+            </div>
+        </div>
+
+    </header>
+
+
+    <!-- QR SCANNER -->
+    <section class="panel scanner-section">
+
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">LIVE SCANNER</p>
+                <h2>Scan attendee ticket</h2>
+            </div>
+
+            <span class="live-pill">● READY</span>
+        </div>
+
+        <div class="camera-wrap">
+
+            <div id="reader"></div>
+
+            <div class="scan-guide">
+                <i class="tl"></i>
+                <i class="tr"></i>
+                <i class="bl"></i>
+                <i class="br"></i>
+
+                <p>Align the QR code inside the frame</p>
+            </div>
+
+            <div class="camera-placeholder" id="camera-placeholder">
+                <b>▣</b>
+                <strong>Camera scanner is stopped</strong>
+                <span>Start the camera to scan attendee QR codes</span>
+            </div>
+
+        </div>
+
+        <div class="scanner-actions">
+            <button class="btn primary" id="start-camera">
+                ▶ Start camera
+            </button>
+
+            <button class="btn outline" id="stop-camera" disabled>
+                ■ Stop camera
+            </button>
+        </div>
+
+        <p class="camera-note">
+            QR codes must contain JSON with the ticket ID and attendee name.
+            Camera access requires HTTPS or localhost.
+        </p>
+
+    </section>
+
+
+    <!-- MANUAL TICKET LOOKUP -->
+    <section class="panel manual-row">
+
+        <label for="ticket-id">
+            ⌨ &nbsp; Manual ticket details
+        </label>
+
+        <div class="manual-controls">
+
+            <input
+                type="text"
+                id="ticket-id"
+                placeholder='{"id":"KC-1001","name":"Jane Doe","category":"VIP"}'
+                autocomplete="off"
+            >
+
+            <button class="btn primary" id="check-ticket">
+                ⌕ &nbsp; Process ticket
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- SCAN RESULT -->
+    <section class="result-card neutral" id="result-card" aria-live="polite">
+
+        <div class="result-symbol" id="result-symbol">✓</div>
+
+        <div class="result-copy">
+            <p class="eyebrow" id="result-label">AWAITING SCAN</p>
+
+            <h2 id="result-title">
+                Ready to verify tickets
+            </h2>
+
+            <p id="result-details">
+                Scan a ticket QR code or paste its JSON details.
+            </p>
+        </div>
+
+        <time id="result-time"></time>
+
+    </section>
+
+
+    <!-- DASHBOARD STATISTICS -->
+    <section class="stats-grid">
+
+        <article class="stat-card">
+            <span class="stat-icon blue">▣</span>
+
+            <div>
+                <strong id="total-count">0</strong>
+                <small>Unique Tickets</small>
+            </div>
+        </article>
+
+        <article class="stat-card">
+            <span class="stat-icon green">✓</span>
+
+            <div>
+                <strong id="checked-count">0</strong>
+                <small>Checked In</small>
+            </div>
+        </article>
+
+        <article class="stat-card">
+            <span class="stat-icon amber">◷</span>
+
+            <div>
+                <strong id="remaining-count">0</strong>
+                <small>Slots Left</small>
+            </div>
+        </article>
+
+    </section>
+
+
+    <!-- RECENT SCANS -->
+    <section class="panel log-section">
+
+        <div class="log-heading">
+            <div>
+                <p class="eyebrow">GATE ACTIVITY</p>
+                <h2>Recent Scans</h2>
+            </div>
+
+            <button class="text-button" id="clear-log">
+                Clear log
+            </button>
+        </div>
+
+        <div class="table-wrap">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>STATUS</th>
+                        <th>TICKET ID</th>
+                        <th>ATTENDEE</th>
+                        <th>TIME</th>
+                    </tr>
+                </thead>
+
+                <tbody id="scan-log">
+                    <tr>
+                        <td colspan="4" class="empty-row">
+                            No scans recorded yet.
+                        </td>
+                    </tr>
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+    <footer>
+
+        <span>Kalenjin Connect 2.0</span>
+
+        <button class="reset-button" id="reset-checkins">
+            ↻ Reset saved tickets
+        </button>
+
+    </footer>
+
+    <p class="disclaimer">
+        Demo mode: ticket details come from the QR and are not authenticated.
+        Records are saved in this browser only; devices do not synchronize.
+    </p>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
