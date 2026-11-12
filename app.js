@@ -1,13 +1,16 @@
 const STORAGE_KEY = "kalenjin-connect-2-scanned-tickets";
 const LOG_KEY = "kalenjin-connect-2-scan-log";
 const CAPACITY_KEY = "kalenjin-connect-2-capacity";
+const GUEST_KEY = "kalenjin-connect-2-guest-list";
 const MAX_TICKETS = 1000;
+const MAX_GUESTS = 5000;
 const MAX_SCAN_LOG = 100;
 const ALARM_MS = 10000;
 
 let ticketsById = new Map();
 let scanLog = [];
 let capacity = 0;
+let guestList = new Map();   // ticket id (lower case) -> attendee record
 
 let scanner = null;
 let scannerRunning = false;
@@ -28,6 +31,11 @@ function initialise() {
     $("scan-next").addEventListener("click", scanNext);
     $("silence-alarm").addEventListener("click", stopAlarm);
     $("check-ticket").addEventListener("click", checkManualTicket);
+    $("guest-file").addEventListener("change", event => {
+        if (event.target.files[0]) importGuestList(event.target.files[0]);
+        event.target.value = "";
+    });
+    $("guest-clear").addEventListener("click", clearGuestList);
 
     $("ticket-id").addEventListener("keydown", event => {
         if (event.key === "Enter") checkManualTicket();
@@ -45,6 +53,7 @@ function initialise() {
     try {
         loadSavedData();
         $("capacity").value = capacity || "";
+        updateGuestStatus();
         updateDashboard();
         renderLog();
         showResult("neutral", "AWAITING SCAN", "Ready to verify tickets",
@@ -80,6 +89,15 @@ function loadSavedData() {
 
     scanLog = state.scanLog.slice(0, MAX_SCAN_LOG);
     capacity = parseInt(localStorage.getItem(CAPACITY_KEY) || "0", 10) || 0;
+
+    guestList = new Map();
+    try {
+        JSON.parse(localStorage.getItem(GUEST_KEY) || "[]").forEach(g => {
+            if (g && typeof g.id === "string") guestList.set(g.id.toLowerCase(), g);
+        });
+    } catch (error) {
+        console.warn("Guest list could not be read", error);
+    }
 }
 
 
@@ -198,39 +216,187 @@ function checkManualTicket() {
 }
 
 
-// READ ALL TICKET DETAILS FROM THE QR PAYLOAD
+// READ THE TICKET FROM THE QR: a bare ticket ID / UUID, a URL containing one,
+// or JSON with details. Details are looked up in the loaded guest list.
 function parseTicketPayload(payload) {
 
-    let data;
+    let data = null;
 
     try {
-        data = JSON.parse(payload);
+        const json = JSON.parse(payload);
+        if (json && typeof json === "object" && !Array.isArray(json)) data = json;
     } catch {
-        return null;
+        // not JSON: treat the QR text as the ticket ID
     }
 
-    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-
-    const id = String(data.id || data.ticketId || "").trim();
-    const name = String(data.name || data.attendee || "").trim();
-    const category = String(data.category || "General").trim();
-    const status = String(data.status || "valid").trim().toLowerCase();
-
-    if (!id || !name || id.length > 128 || name.length > 200 ||
-        category.length > 100 || status.length > 40) {
-        return null;
-    }
-
-    // keep every field in the QR (email, phone, seat, ...) so it can be displayed
+    let id;
     const fields = {};
-    Object.keys(data).slice(0, 30).forEach(key => {
-        const value = data[key];
-        if (["string", "number", "boolean"].includes(typeof value)) {
-            fields[key.slice(0, 50)] = String(value).slice(0, 300);
+
+    if (data) {
+        id = String(data.id || data.ticketId || data.ticket_id || "").trim();
+        Object.keys(data).slice(0, 30).forEach(key => {
+            if (["string", "number", "boolean"].includes(typeof data[key])) {
+                fields[key.slice(0, 50)] = String(data[key]).slice(0, 300);
+            }
+        });
+    } else {
+        const uuid = payload.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+        id = (uuid ? uuid[0] : payload).trim();
+        if (/\s/.test(id)) return null;
+    }
+
+    if (!id || id.length > 128) return null;
+
+    const listed = guestList.get(id.toLowerCase());
+
+    const name = String((data && (data.name || data.attendee)) || (listed && listed.name) || "").trim();
+    const category = String((data && data.category) || (listed && listed.category) || "General").trim();
+    const status = String((data && data.status) || (listed && listed.status) || "valid").trim().toLowerCase();
+
+    // a plain ID that is not in a loaded guest list is not a known ticket
+    if (!data && !listed && guestList.size > 0) {
+        return { id, unlisted: true, fields: { "Ticket ID": id } };
+    }
+
+    // JSON tickets still need a name; plain IDs without a list are checked in anonymously
+    if (data && !name) return null;
+
+    const noList = !data && !listed;
+
+    return {
+        id,
+        name: name || "Unknown attendee",
+        category,
+        status,
+        noList,
+        fields: noList ? { "Ticket ID": id } : { ...(listed ? listed.fields : {}), ...fields }
+    };
+}
+
+
+// GUEST LIST (CSV or JSON exported from your ticketing platform)
+function importGuestList(file) {
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        try {
+            const rows = /\.json$/i.test(file.name) ? jsonRows(reader.result) : csvRows(reader.result);
+            const next = new Map();
+
+            rows.slice(0, MAX_GUESTS).forEach(row => {
+                const guest = buildGuest(row);
+                if (guest) next.set(guest.id.toLowerCase(), guest);
+            });
+
+            if (!next.size) {
+                throw new Error('No tickets found. The file needs a "Ticket ID" column and an attendee name column.');
+            }
+
+            localStorage.setItem(GUEST_KEY, JSON.stringify(Array.from(next.values())));
+            guestList = next;
+            updateGuestStatus();
+            updateDashboard();
+
+            showResult("neutral", "GUEST LIST LOADED", next.size + " tickets loaded",
+                "Scan a ticket QR code to see the attendee's details.");
+
+        } catch (error) {
+            showResult("danger", "GUEST LIST ERROR", "Could not load the file", error.message);
+            console.error(error);
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+function clearGuestList() {
+
+    if (!confirm("Remove the loaded guest list? Scan history stays.")) return;
+
+    guestList = new Map();
+    localStorage.removeItem(GUEST_KEY);
+    updateGuestStatus();
+    updateDashboard();
+}
+
+function updateGuestStatus() {
+    $("guest-status").textContent = guestList.size
+        ? guestList.size + " tickets loaded"
+        : "No guest list loaded";
+}
+
+function jsonRows(text) {
+    const data = JSON.parse(text);
+    const list = Array.isArray(data) ? data : (data.tickets || data.attendees || []);
+    return list.filter(item => item && typeof item === "object");
+}
+
+function csvRows(text) {
+
+    text = text.replace(/^\uFEFF/, "");
+    const firstLine = text.split(/\r?\n/)[0] || "";
+    const delimiter = [",", ";", "\t"].sort(
+        (a, b) => firstLine.split(b).length - firstLine.split(a).length)[0];
+
+    const table = [];
+    let row = [], cell = "", quoted = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (quoted) {
+            if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+            else if (ch === '"') quoted = false;
+            else cell += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === delimiter) { row.push(cell); cell = ""; }
+        else if (ch === "\n" || ch === "\r") {
+            if (ch === "\r" && text[i + 1] === "\n") i++;
+            row.push(cell); cell = "";
+            if (row.some(c => c.trim())) table.push(row);
+            row = [];
+        } else cell += ch;
+    }
+    row.push(cell);
+    if (row.some(c => c.trim())) table.push(row);
+
+    const headers = (table.shift() || []).map(h => h.trim());
+
+    return table.map(cells => {
+        const obj = {};
+        headers.forEach((h, i) => { if (h) obj[h] = (cells[i] || "").trim(); });
+        return obj;
+    });
+}
+
+function buildGuest(row) {
+
+    const keys = Object.keys(row);
+    const find = re => keys.find(k => re.test(k.trim()));
+
+    const idKey = find(/^(ticket[\s_-]*)?(id|uuid|code|number|no)$|uuid|qr|barcode/i);
+    const nameKey = find(/name|attendee/i);
+    const statusKey = find(/^status$/i);
+    const categoryKey = find(/category|type|tier/i);
+
+    const id = idKey ? String(row[idKey] || "").trim() : "";
+    if (!id || id.length > 128) return null;
+
+    const fields = {};
+    keys.slice(0, 30).forEach(k => {
+        const value = row[k];
+        if (value !== "" && value != null && typeof value !== "object") {
+            fields[k.slice(0, 50)] = String(value).slice(0, 300);
         }
     });
 
-    return { id, name, category, status, fields };
+    return {
+        id,
+        name: String((nameKey && row[nameKey]) || id).trim(),
+        category: String((categoryKey && row[categoryKey]) || "General").trim(),
+        status: String((statusKey && row[statusKey]) || "valid").trim().toLowerCase(),
+        fields
+    };
 }
 
 
@@ -300,6 +466,15 @@ function verifyTicket(payload) {
         return;
     }
 
+    if (ticket.unlisted) {
+        recordScan(ticket.id, "Not on list", "Unknown attendee", "danger");
+        showResult("danger", "TICKET NOT FOUND", "Not on the guest list",
+            "Ticket " + ticket.id + " is not in the loaded guest list. Refer attendee to the event desk.",
+            ticket.fields);
+        playAlert("invalid");
+        return;
+    }
+
     if (ticketsById.size >= MAX_TICKETS) {
         showResult("danger", "CAPACITY REACHED", "1,000 unique tickets already saved",
             "This new ticket was not saved. Previously scanned tickets can still be checked for duplicates.",
@@ -346,7 +521,8 @@ function verifyTicket(payload) {
 
     showResult("success", "TICKET VALID — CHECKED IN",
         `${ticket.name} · ${ticket.category}`,
-        `Checked in at ${new Date(time).toLocaleTimeString()}.`,
+        `Checked in at ${new Date(time).toLocaleTimeString()}.` +
+        (ticket.noList ? " No guest list is loaded, so attendee details are unavailable." : ""),
         ticket.fields);
     playAlert("success");
 }
@@ -394,8 +570,8 @@ function updateDashboard() {
 
     $("total-count").textContent = saved.length;
     $("checked-count").textContent = checked;
-    $("remaining-count").textContent =
-        capacity > 0 ? Math.max(0, capacity - checked) : "—";
+    const total = capacity > 0 ? capacity : guestList.size;
+    $("remaining-count").textContent = total > 0 ? Math.max(0, total - checked) : "—";
 }
 
 

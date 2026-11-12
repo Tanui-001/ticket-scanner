@@ -81,7 +81,7 @@
         </div>
 
         <p class="camera-note">
-            QR codes must contain JSON with at least the ticket ID and attendee name; email, phone and other fields are shown too. The camera stops after each scan.
+            The QR holds the ticket ID (UUID). Load your guest list so the attendee name, phone and ticket type are shown. The camera stops after each scan.
             Camera access requires HTTPS or localhost.
         </p>
 
@@ -110,6 +110,15 @@
 
         </div>
 
+    </section>
+
+
+    <!-- GUEST LIST -->
+    <section class="panel capacity-row">
+        <label for="guest-file">Guest list (CSV or JSON)</label>
+        <input type="file" id="guest-file" accept=".csv,.json,text/csv,application/json">
+        <strong id="guest-status">No guest list loaded</strong>
+        <button class="text-button" id="guest-clear">Remove list</button>
     </section>
 
 
